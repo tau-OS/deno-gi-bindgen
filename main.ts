@@ -223,9 +223,11 @@ parsed.repository.namespace.function.forEach((f) => {
 
   generated += `export const ${
     f["@name"]
-  } = (${paramsType}): ${generateReturnType(
-    f["return-value"]
-  )} => {return {} as any}\n`;
+  } = (${paramsType}): ${generateReturnType(f["return-value"])} => {
+    return ffi.symbols["${f["@c:identifier"]}"](${parameter
+    .map((p) => getValidIdentifier(p["@name"]))
+    .join(", ")});
+  }\n`;
 });
 
 const objectFile = parsed.repository.namespace["@shared-library"].split(",")[0];
@@ -249,7 +251,7 @@ if (!libraryPath) {
   throw 'Could not find ${objectFile}'
 }
   
-const ffi = Deno.dlopen(libraryPath as any, ${JSON.stringify(functions)});
+const ffi = Deno.dlopen(libraryPath, ${JSON.stringify(functions)});
 ` + generated;
 
 await Deno.writeFile("out.ts", new TextEncoder().encode(generated));
