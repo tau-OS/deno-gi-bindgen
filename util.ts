@@ -196,19 +196,23 @@ export const generateReturnType = (r: ReturnValue) =>
       : r.array.type["@name"] + "[]"
     : "void") ?? "void";
 
+export const getTypescriptType = (p: Parameter) => {
+  return p.type?.["@name"]
+    ? goBasicTypeToTsType(p.type["@name"])
+      ? goBasicTypeToTsType(p.type["@name"])
+      : p.type["@name"]
+    : p.array?.type["@name"]
+    ? goBasicTypeToTsType(p.array.type["@name"])
+      ? goBasicTypeToTsType(p.array.type["@name"]) + "[]"
+      : p.array.type["@name"] + "[]"
+    : undefined;
+};
+
 export const generateParams = (params: Parameter[], namespace: string) =>
   params
     .filter((param) => param["@name"] !== "...")
     .map((p, i) => {
-      const type = p.type?.["@name"]
-        ? goBasicTypeToTsType(p.type["@name"])
-          ? goBasicTypeToTsType(p.type["@name"])
-          : p.type["@name"]
-        : p.array?.type["@name"]
-        ? goBasicTypeToTsType(p.array.type["@name"])
-          ? goBasicTypeToTsType(p.array.type["@name"]) + "[]"
-          : p.array.type["@name"] + "[]"
-        : undefined;
+      const type = getTypescriptType(p);
 
       if (!type) throw new Error("Invalid parameter type");
 
