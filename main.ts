@@ -228,7 +228,7 @@ parsed.repository.namespace.function.forEach((f) => {
   )} => {return {} as any}\n`;
 });
 
-const objectFile = parsed.repository.namespace["@shared-library"].split(",")[0]
+const objectFile = parsed.repository.namespace["@shared-library"].split(",")[0];
 
 generated =
   `
@@ -249,9 +249,7 @@ if (!libraryPath) {
   throw 'Could not find ${objectFile}'
 }
   
-const ffi = Deno.dlopen(libraryPath as any, ${JSON.stringify(
-    functions
-  )});
+const ffi = Deno.dlopen(libraryPath as any, ${JSON.stringify(functions)});
 ` + generated;
 
 await Deno.writeFile("out.ts", new TextEncoder().encode(generated));
