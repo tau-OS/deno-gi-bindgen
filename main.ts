@@ -228,9 +228,28 @@ parsed.repository.namespace.function.forEach((f) => {
   )} => {return {} as any}\n`;
 });
 
+const objectFile = parsed.repository.namespace["@shared-library"].split(",")[0]
+
 generated =
   `
-const ffi = Deno.dlopen('/opt/homebrew/Cellar/glib/2.72.0/lib/libglib-2.0.dylib', ${JSON.stringify(
+const search = Deno.run({
+  cmd: ['whereis', '${objectFile}'],
+  stdout: 'piped',
+})
+
+const output = new TextDecoder().decode(await search.output())
+
+search.close()
+
+const libraryPath = /: ([^\\s]+)/g.exec(output)[1]
+
+console.log(libraryPath)
+
+if (!libraryPath) {
+  throw 'Could not find ${objectFile}'
+}
+  
+const ffi = Deno.dlopen(libraryPath as any, ${JSON.stringify(
     functions
   )});
 ` + generated;
