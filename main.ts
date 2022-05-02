@@ -241,7 +241,7 @@ const output = new TextDecoder().decode(await search.output())
 
 search.close()
 
-const libraryPath = /: ([^\\s]+)/g.exec(output)[1]
+const libraryPath = /: ([^\\s]+)/g.exec(output)?.[1]
 
 console.log(libraryPath)
 
