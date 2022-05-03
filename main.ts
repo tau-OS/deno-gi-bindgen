@@ -237,26 +237,10 @@ const objectFile = parsed.repository.namespace["@shared-library"].split(",")[0];
 
 generated =
   `
-import { toFFIValue } from './runtime.ts';
-
-const search = Deno.run({
-  cmd: ['whereis', '${objectFile}'],
-  stdout: 'piped',
-})
-
-const output = new TextDecoder().decode(await search.output())
-
-search.close()
-
-const libraryPath = /: ([^\\s]+)/g.exec(output)?.[1]
-
-console.log(libraryPath)
-
-if (!libraryPath) {
-  throw 'Could not find ${objectFile}'
-}
-  
-const ffi = Deno.dlopen(libraryPath, ${JSON.stringify(functions)});
+import { toFFIValue, dlSearch } from "./runtime.ts";
+const ffi = Deno.dlopen(await dlSearch(${objectFile}), ${JSON.stringify(
+    functions
+  )});
 ` + generated;
 
 await Deno.writeFile("out.ts", new TextEncoder().encode(generated));

@@ -1,3 +1,22 @@
+export const dlSearch = async () => {
+  const search = Deno.run({
+    cmd: ["whereis", "${objectFile}"],
+    stdout: "piped",
+  });
+
+  const output = new TextDecoder().decode(await search.output());
+
+  search.close();
+
+  const libraryPath = /: ([^\\s]+)/g.exec(output)?.[1];
+
+  if (!libraryPath) {
+    throw "Could not find ${objectFile}";
+  }
+
+  return libraryPath;
+};
+
 export const toFFIValue = (value: unknown) => {
   if (value instanceof Array) {
     // /shrug
