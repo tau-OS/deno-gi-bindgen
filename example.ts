@@ -1,3 +1,3 @@
-import { rmdir } from "./out.ts";
+import { get_home_dir } from "./out.ts";
 
-rmdir("/var/home/lea/Documents/deno-gi-bindgen/jowo");
+console.log(get_home_dir());

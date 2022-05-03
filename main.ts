@@ -222,14 +222,28 @@ parsed.repository.namespace.function.forEach((f) => {
       : goBasicTypeToFFIType(f["return-value"].type?.["@name"]!),
   };
 
-  // const params = parameter.map((p) => getTypescriptType(p));
+  const returnType = f["return-value"].array
+    ? "other"
+    : ["string", "number", "boolean"].includes(
+        goBasicTypeToTsType(f["return-value"].type?.["@name"]!)!
+      )
+    ? goBasicTypeToTsType(f["return-value"].type?.["@name"]!)
+    : "other";
+  // ? ["string", "number", "boolean"].includes(
+  //     goBasicTypeToTsType(f["return-value"].type?.["@name"]!)!
+  //   )
+  //   ? goBasicTypeToTsType(f["return-value"].type?.["@name"]!)
+  //   : "other"
+  // : "other";
 
   generated += `export const ${
     f["@name"]
   } = (${paramsType}): ${generateReturnType(f["return-value"])} => {
-    return ffi.symbols["${f["@c:identifier"]}"](${parameter
+    return fromFFIValue(${JSON.stringify(returnType)}, ffi.symbols["${
+    f["@c:identifier"]
+  }"](${parameter
     .map((p) => `toFFIValue(${getValidIdentifier(p["@name"])})`)
-    .join(", ")}) as any;
+    .join(", ")}));
   }\n`;
 });
 
@@ -237,7 +251,7 @@ const objectFile = parsed.repository.namespace["@shared-library"].split(",")[0];
 
 generated =
   /* ts */ `
-import { toFFIValue, dlSearch } from "./runtime.ts";
+import { toFFIValue, dlSearch, fromFFIValue } from "./runtime.ts";
 const ffi = Deno.dlopen(await dlSearch(${JSON.stringify(
     objectFile
   )}), ${JSON.stringify(functions)});

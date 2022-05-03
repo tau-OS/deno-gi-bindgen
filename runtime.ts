@@ -33,3 +33,26 @@ export const toFFIValue = (value: unknown) => {
 
   return value as any;
 };
+
+type fromFFIValueType<T> = T extends "string" ? Deno.UnsafePointer : any;
+
+export const fromFFIValue = <
+  T extends "string" | "boolean" | "number" | "other"
+>(
+  type: T,
+  value: fromFFIValueType<T>
+) => {
+  if (type === "string") {
+    return new Deno.UnsafePointerView(value).getCString();
+  }
+
+  if (typeof value == "boolean") {
+    return value ? true : false;
+  }
+
+  if (type === "number") {
+    return value;
+  }
+
+  return value as any;
+};
