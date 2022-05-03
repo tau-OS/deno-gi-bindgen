@@ -28,7 +28,11 @@ export const toFFIValue = (value: unknown) => {
   }
 
   if (typeof value === "string") {
-    return new TextEncoder().encode(value);
+    return new Uint8Array([
+      ...new TextEncoder().encode(value),
+      // null terminator
+      ...new Uint8Array([0]),
+    ]);
   }
 
   return value as any;
