@@ -1,6 +1,6 @@
-export const dlSearch = async () => {
+export const dlSearch = async (dl: string) => {
   const search = Deno.run({
-    cmd: ["whereis", "${objectFile}"],
+    cmd: ["whereis", dl],
     stdout: "piped",
   });
 
@@ -8,7 +8,7 @@ export const dlSearch = async () => {
 
   search.close();
 
-  const libraryPath = /: ([^\\s]+)/g.exec(output)?.[1];
+  const libraryPath = /: ([^\s]+)/g.exec(output)?.[1];
 
   if (!libraryPath) {
     throw "Could not find ${objectFile}";

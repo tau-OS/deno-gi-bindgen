@@ -43,7 +43,7 @@ parsed.repository.namespace.constant.forEach((c) => {
       .join("")} */\n`;
   }
 
-  generated += `export const ${getValidIdentifier(
+  generated += /* ts */ `export const ${getValidIdentifier(
     c["@name"]
   )} = ${JSON.stringify(c["@value"])};\n`;
 });
@@ -236,11 +236,11 @@ parsed.repository.namespace.function.forEach((f) => {
 const objectFile = parsed.repository.namespace["@shared-library"].split(",")[0];
 
 generated =
-  `
+  /* ts */ `
 import { toFFIValue, dlSearch } from "./runtime.ts";
-const ffi = Deno.dlopen(await dlSearch(${objectFile}), ${JSON.stringify(
-    functions
-  )});
+const ffi = Deno.dlopen(await dlSearch(${JSON.stringify(
+    objectFile
+  )}), ${JSON.stringify(functions)});
 ` + generated;
 
 await Deno.writeFile("out.ts", new TextEncoder().encode(generated));
