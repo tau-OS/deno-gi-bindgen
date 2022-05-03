@@ -17,9 +17,11 @@ export const dlSearch = async (dl: string) => {
   return libraryPath;
 };
 
+export const getNullTerminatedCString = (str: string) =>
+  new Uint8Array([...new TextEncoder().encode(str), ...new Uint8Array([0])]);
+
 export const toFFIValue = (value: unknown) => {
   if (value instanceof Array) {
-    // /shrug
     return 1;
   }
 
@@ -28,11 +30,7 @@ export const toFFIValue = (value: unknown) => {
   }
 
   if (typeof value === "string") {
-    return new Uint8Array([
-      ...new TextEncoder().encode(value),
-      // null terminator
-      ...new Uint8Array([0]),
-    ]);
+    return getNullTerminatedCString(value);
   }
 
   return value as any;

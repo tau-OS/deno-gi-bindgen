@@ -229,12 +229,6 @@ parsed.repository.namespace.function.forEach((f) => {
       )
     ? goBasicTypeToTsType(f["return-value"].type?.["@name"]!)
     : "other";
-  // ? ["string", "number", "boolean"].includes(
-  //     goBasicTypeToTsType(f["return-value"].type?.["@name"]!)!
-  //   )
-  //   ? goBasicTypeToTsType(f["return-value"].type?.["@name"]!)
-  //   : "other"
-  // : "other";
 
   generated += `export const ${
     f["@name"]
