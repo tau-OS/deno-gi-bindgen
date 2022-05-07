@@ -100,6 +100,83 @@ export const goBasicTypeToFFIType = (type: string): Deno.NativeType => {
   }
 };
 
+// export const getBaseFFIConverter = (type: string) => {
+//   if (p.type["@name"] === "gboolean") {
+//     return "boolean";
+//   }
+
+//   if (p.type["@name"] === "utf8" || p.type["@name"] === "filename") {
+//     return "string";
+//   }
+// };
+
+const ffiNumberTypes = new Set([
+  "i8",
+  "u8",
+  "i16",
+  "u16",
+  "i32",
+  "u32",
+  "i64",
+  "u64",
+  "usize",
+  "f32",
+  "f64",
+]);
+
+export const getFFIConverter = (p: Parameter, identifier: string) => {
+  if (p.array) {
+    const ffiArrayType = goBasicTypeToFFIType(p.array.type["@name"]);
+    if (ffiNumberTypes.has(ffiArrayType)) {
+      switch (ffiArrayType) {
+        case "i8":
+          return `new Int8Array(${identifier})`;
+        case "u8":
+          return `new Uint8Array(${identifier})`;
+        case "i16":
+          return `new Int16Array(${identifier})`;
+        case "u16":
+          return `new Uint16Array(${identifier})`;
+        case "i32":
+          return `new Int32Array(${identifier})`;
+        case "u32":
+          return `new Uint32Array(${identifier})`;
+        case "i64":
+          return `new BigInt64Array(${identifier})`;
+        case "u64":
+          return `new BigUint64Array(${identifier})`;
+        case "usize":
+          return `new Uint32Array(${identifier})`;
+        case "f32":
+          return `new Float32Array(${identifier})`;
+        case "f64":
+          return `new Float64Array(${identifier})`;
+      }
+      // new Uint8Array([1]).
+      // Deno.UnsafePointer.of()
+    }
+
+    if (
+      p.array.type["@name"] === "utf8" ||
+      p.array.type["@name"] === "filename"
+    ) {
+      return `new BigInt64Array(${identifier}.map((x) => Deno.UnsafePointer.of(getNullTerminatedCString(x)).value))`;
+    }
+
+    return `noop(${identifier})`;
+  }
+
+  if (p.type["@name"] === "gboolean") {
+    return `getCBoolean(${identifier})`;
+  }
+
+  if (p.type["@name"] === "utf8" || p.type["@name"] === "filename") {
+    return `getNullTerminatedCString(${identifier})`;
+  }
+
+  return `noop(${identifier})`;
+};
+
 const replacementKeywords = new Set([
   "abstract",
   "arguments",

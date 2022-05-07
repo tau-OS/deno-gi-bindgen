@@ -4,6 +4,7 @@ import {
   generateParams,
   generateParamsDocs,
   generateReturnType,
+  getFFIConverter,
   // getTypescriptType,
   getValidIdentifier,
   goBasicTypeToFFIType,
@@ -236,7 +237,7 @@ parsed.repository.namespace.function.forEach((f) => {
     return fromFFIValue(${JSON.stringify(returnType)}, ffi.symbols["${
     f["@c:identifier"]
   }"](${parameter
-    .map((p) => `toFFIValue(${getValidIdentifier(p["@name"])})`)
+    .map((p) => getFFIConverter(p, getValidIdentifier(p["@name"])))
     .join(", ")}));
   }\n`;
 });
@@ -245,7 +246,7 @@ const objectFile = parsed.repository.namespace["@shared-library"].split(",")[0];
 
 generated =
   /* ts */ `
-import { toFFIValue, dlSearch, fromFFIValue } from "./runtime.ts";
+import { dlSearch, fromFFIValue, noop, getCBoolean, getNullTerminatedCString } from "./runtime.ts";
 const ffi = Deno.dlopen(await dlSearch(${JSON.stringify(
     objectFile
   )}), ${JSON.stringify(functions)});

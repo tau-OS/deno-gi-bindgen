@@ -20,21 +20,7 @@ export const dlSearch = async (dl: string) => {
 export const getNullTerminatedCString = (str: string) =>
   new Uint8Array([...new TextEncoder().encode(str), ...new Uint8Array([0])]);
 
-export const toFFIValue = (value: unknown) => {
-  if (value instanceof Array) {
-    return 1;
-  }
-
-  if (typeof value === "boolean") {
-    return value ? 1 : 0;
-  }
-
-  if (typeof value === "string") {
-    return getNullTerminatedCString(value);
-  }
-
-  return value as any;
-};
+export const getCBoolean = (bool: boolean) => (bool ? 1 : 0);
 
 type fromFFIValueType<T> = T extends "string" ? Deno.UnsafePointer : any;
 
@@ -58,3 +44,5 @@ export const fromFFIValue = <
 
   return value as any;
 };
+
+export const noop = (a: any) => a as any;
