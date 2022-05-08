@@ -1,4 +1,4 @@
-import type { Parameter, ReturnValue } from "./gi.ts";
+import type { Parameter, ReturnValue, Parameters, Type, Array } from "./gi.ts";
 
 export const goBasicTypeToTsType = (type: string): string | undefined => {
   switch (type) {
@@ -98,6 +98,18 @@ export const goBasicTypeToFFIType = (type: string): Deno.NativeType => {
     default:
       return "pointer";
   }
+};
+
+export const goTypeToFFIType = (type: { type?: Type; array?: Array }) => {
+  if (type.array) {
+    return "pointer";
+  }
+
+  if (!type.type) {
+    throw new Error("Type is not specified");
+  }
+
+  return goBasicTypeToFFIType(type.type["@name"]);
 };
 
 // export const getBaseFFIConverter = (type: string) => {
@@ -304,3 +316,23 @@ export const generateParams = (params: Parameter[], namespace: string) =>
 
 export const xmlList = <T>(value: T | T[] | undefined): T[] =>
   value ? (value instanceof Array ? value : [value]) : [];
+
+export const generateFFIFunction = ({
+  parameters,
+  returnType,
+}: {
+  parameters?: Parameters;
+  returnType: ReturnValue;
+}): Deno.ForeignFunction => {
+  return {
+    parameters: parameters
+      ? [
+          ...(parameters["instance-parameter"]
+            ? [goTypeToFFIType(parameters["instance-parameter"])]
+            : []),
+          ...xmlList(parameters.parameter).map((p) => goTypeToFFIType(p)),
+        ]
+      : [],
+    result: goTypeToFFIType(returnType),
+  };
+};

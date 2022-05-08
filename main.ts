@@ -1,11 +1,11 @@
 import { parse } from "https://deno.land/x/xml@2.0.4/mod.ts";
 import type { Root } from "./gi.ts";
 import {
+  generateFFIFunction,
   generateParams,
   generateReturnType,
   getTypescriptType,
   getValidIdentifier,
-  // getTypescriptType,
   goBasicTypeToTsType,
   xmlList,
 } from "./util.ts";
@@ -46,21 +46,8 @@ sourceFile.addImportDeclaration({
   ],
 });
 
-// sourceFile.addVariableStatement({
-//   declarationKind: VariableDeclarationKind.Const,
-//   declarations: [
-//     {
-//       name: "ffi",
-//       // TODO: AAAAA
-//       initializer: `Deno.dlopen(await dlSearch(${JSON.stringify(
-//         objectFile
-//       )}), ${JSON.stringify(functions)});`,
-//     },
-//   ],
-// });
-
 const namespace = parsed.repository.namespace["@name"];
-const functions: Record<string, Deno.ForeignFunction> = {};
+const ffiFunctions: Record<string, Deno.ForeignFunction> = {};
 
 parsed.repository.namespace.constant.forEach((c) => {
   const doc = c.doc?.["#text"];
@@ -141,7 +128,7 @@ parsed.repository.namespace.bitfield.forEach((b) => {
 });
 
 parsed.repository.namespace.callback.forEach((c) => {
-  const parameters = xmlList(c.parameters.parameter);
+  const parameters = xmlList(c.parameters?.parameter);
   const paramsType = generateParams(parameters, namespace);
 
   const doc = c.doc?.["#text"];
@@ -198,7 +185,7 @@ parsed.repository.namespace.union.forEach((u) => {
   const classType = sourceFile.addClass({
     docs: doc ? [{ description: doc }] : [],
     isExported: true,
-    extends: "GUnion",
+    implements: ["GUnion"],
     name: u["@name"],
   });
 
@@ -254,12 +241,8 @@ parsed.repository.namespace.record.forEach((r) => {
     docs: doc ? [{ description: doc }] : [],
   });
 
-  const func = (
-    r.function ? (r.function instanceof Array ? r.function : [r.function]) : []
-  ).filter((f) => f["@introspectable"] !== 0);
-  const method = (
-    r.method ? (r.method instanceof Array ? r.method : [r.method]) : []
-  ).filter((m) => m["@introspectable"] !== 0);
+  const func = xmlList(r.function).filter((f) => f["@introspectable"] !== 0);
+  const method = xmlList(r.method).filter((m) => m["@introspectable"] !== 0);
 
   func.forEach((f) => {
     const parameters = xmlList(f.parameters?.parameter);
@@ -293,6 +276,11 @@ parsed.repository.namespace.record.forEach((r) => {
     });
 
     method.addStatements([Writers.returnStatement("{} as any")]);
+
+    ffiFunctions[f["@c:identifier"]] = generateFFIFunction({
+      parameters: f.parameters,
+      returnType: f["return-value"],
+    });
   });
 
   method.forEach((f) => {
@@ -326,6 +314,11 @@ parsed.repository.namespace.record.forEach((r) => {
     });
 
     method.addStatements([Writers.returnStatement("{} as any")]);
+
+    ffiFunctions[f["@c:identifier"]] = generateFFIFunction({
+      parameters: f.parameters,
+      returnType: f["return-value"],
+    });
   });
 });
 
@@ -365,6 +358,24 @@ parsed.repository.namespace.function.forEach((f) => {
   });
 
   func.addStatements([Writers.returnStatement("{} as any")]);
+
+  ffiFunctions[f["@c:identifier"]] = generateFFIFunction({
+    parameters: f.parameters,
+    returnType: f["return-value"],
+  });
+});
+
+sourceFile.insertVariableStatement(1, {
+  isExported: true,
+  declarationKind: VariableDeclarationKind.Const,
+  declarations: [
+    {
+      name: "ffi",
+      initializer: `Deno.dlopen(await dlSearch(${JSON.stringify(
+        objectFile
+      )}), ${JSON.stringify(ffiFunctions)})`,
+    },
+  ],
 });
 
 await sourceFile.save();

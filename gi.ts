@@ -270,7 +270,7 @@ export interface Callback {
   "@c:type": string;
   doc?: Doc;
   "return-value": ReturnValue;
-  parameters: Parameters;
+  parameters?: Parameters;
 }
 
 export interface GlibBoxed {
