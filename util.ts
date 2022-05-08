@@ -301,3 +301,6 @@ export const generateParams = (params: Parameter[], namespace: string) =>
       return `${getValidIdentifier(p["@name"])}: ${type}`;
     })
     .join(", ");
+
+export const xmlList = <T>(value: T | T[] | undefined): T[] =>
+  value ? (value instanceof Array ? value : [value]) : [];

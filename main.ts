@@ -7,6 +7,7 @@ import {
   getValidIdentifier,
   // getTypescriptType,
   goBasicTypeToTsType,
+  xmlList,
 } from "./util.ts";
 import {
   Project,
@@ -85,7 +86,7 @@ parsed.repository.namespace.constant.forEach((c) => {
 
 parsed.repository.namespace.enumeration.forEach((e) => {
   const doc = e.doc?.["#text"];
-  const member = e.member instanceof Array ? e.member : [e.member];
+  const members = xmlList(e.member);
 
   sourceFile.addEnum({
     isExported: true,
@@ -97,7 +98,7 @@ parsed.repository.namespace.enumeration.forEach((e) => {
           },
         ]
       : [],
-    members: member.map((m) => ({
+    members: members.map((m) => ({
       name: m["@name"],
       value: m["@value"],
       docs: m.doc?.["#text"]
@@ -113,7 +114,7 @@ parsed.repository.namespace.enumeration.forEach((e) => {
 
 parsed.repository.namespace.bitfield.forEach((b) => {
   const doc = b.doc?.["#text"];
-  const member = b.member instanceof Array ? b.member : [b.member];
+  const members = xmlList(b.member);
 
   sourceFile.addEnum({
     isExported: true,
@@ -125,7 +126,7 @@ parsed.repository.namespace.bitfield.forEach((b) => {
           },
         ]
       : [],
-    members: member.map((m) => ({
+    members: members.map((m) => ({
       name: m["@name"],
       value: m["@value"],
       docs: m.doc?.["#text"]
@@ -140,13 +141,8 @@ parsed.repository.namespace.bitfield.forEach((b) => {
 });
 
 parsed.repository.namespace.callback.forEach((c) => {
-  const parameter = c.parameters?.parameter
-    ? c.parameters.parameter instanceof Array
-      ? c.parameters.parameter
-      : [c.parameters.parameter]
-    : [];
-
-  const paramsType = generateParams(parameter, namespace);
+  const parameters = xmlList(c.parameters.parameter);
+  const paramsType = generateParams(parameters, namespace);
 
   const doc = c.doc?.["#text"];
 
@@ -155,7 +151,7 @@ parsed.repository.namespace.callback.forEach((c) => {
       ? [
           {
             description: doc,
-            tags: parameter.map((p) => ({
+            tags: parameters.map((p) => ({
               tagName: "param",
               text: `${p["@name"]} ${p.doc?.["#text"]}`,
             })),
@@ -187,6 +183,63 @@ parsed.repository.namespace.alias.forEach((a) => {
 
 sourceFile.addInterface({
   isExported: true,
+  name: "GUnion",
+  properties: [
+    {
+      name: "pointer",
+      type: "Deno.UnsafePointer",
+    },
+  ],
+});
+
+parsed.repository.namespace.union.forEach((u) => {
+  const doc = u.doc?.["#text"];
+
+  const classType = sourceFile.addClass({
+    docs: doc ? [{ description: doc }] : [],
+    isExported: true,
+    extends: "GUnion",
+    name: u["@name"],
+  });
+
+  const methods = xmlList(u.method);
+
+  methods.forEach((m) => {
+    const parameters = xmlList(m.parameters.parameter);
+    const method = classType.addMethod({
+      name: m["@name"],
+      docs: m.doc?.["#text"]
+        ? [
+            {
+              description: m.doc?.["#text"],
+              tags: parameters.map((p) => {
+                const formattedName = getValidIdentifier(p["@name"]);
+
+                return {
+                  tagName: "param",
+                  text: `${formattedName} ${p.doc?.["#text"]}`,
+                };
+              }),
+            },
+          ]
+        : [],
+      returnType: generateReturnType(m["return-value"]),
+      parameters: parameters.map((p) => {
+        const formattedName = getValidIdentifier(p["@name"]);
+
+        return {
+          name: formattedName,
+          type: getTypescriptType(p, namespace),
+        };
+      }),
+    });
+
+    method.addStatements([Writers.returnStatement("{} as any")]);
+  });
+});
+
+sourceFile.addInterface({
+  isExported: true,
   name: "GObject",
 });
 
@@ -209,19 +262,14 @@ parsed.repository.namespace.record.forEach((r) => {
   ).filter((m) => m["@introspectable"] !== 0);
 
   func.forEach((f) => {
-    const parameter = f.parameters?.parameter
-      ? f.parameters.parameter instanceof Array
-        ? f.parameters.parameter
-        : [f.parameters.parameter]
-      : [];
-
+    const parameters = xmlList(f.parameters?.parameter);
     const method = classType.addMethod({
       name: f["@name"],
       docs: f.doc?.["#text"]
         ? [
             {
               description: f.doc?.["#text"],
-              tags: parameter.map((p) => {
+              tags: parameters.map((p) => {
                 const formattedName = getValidIdentifier(p["@name"]);
 
                 return {
@@ -234,7 +282,7 @@ parsed.repository.namespace.record.forEach((r) => {
         : [],
       isStatic: true,
       returnType: generateReturnType(f["return-value"]),
-      parameters: parameter.map((p) => {
+      parameters: parameters.map((p) => {
         const formattedName = getValidIdentifier(p["@name"]);
 
         return {
@@ -248,19 +296,14 @@ parsed.repository.namespace.record.forEach((r) => {
   });
 
   method.forEach((f) => {
-    const parameter = f.parameters?.parameter
-      ? f.parameters.parameter instanceof Array
-        ? f.parameters.parameter
-        : [f.parameters.parameter]
-      : [];
-
+    const parameters = xmlList(f.parameters?.parameter);
     const method = classType.addMethod({
       name: f["@name"],
       docs: f.doc?.["#text"]
         ? [
             {
               description: f.doc?.["#text"],
-              tags: parameter.map((p) => {
+              tags: parameters.map((p) => {
                 const formattedName = getValidIdentifier(p["@name"]);
 
                 return {
@@ -272,7 +315,7 @@ parsed.repository.namespace.record.forEach((r) => {
           ]
         : [],
       returnType: generateReturnType(f["return-value"]),
-      parameters: parameter.map((p) => {
+      parameters: parameters.map((p) => {
         const formattedName = getValidIdentifier(p["@name"]);
 
         return {
@@ -289,12 +332,7 @@ parsed.repository.namespace.record.forEach((r) => {
 parsed.repository.namespace.function.forEach((f) => {
   if (f["@introspectable"] === 0) return;
 
-  const parameter = f.parameters?.parameter
-    ? f.parameters.parameter instanceof Array
-      ? f.parameters.parameter
-      : [f.parameters.parameter]
-    : [];
-
+  const parameters = xmlList(f.parameters?.parameter);
   const doc = f.doc?.["#text"];
 
   const func = sourceFile.addFunction({
@@ -304,7 +342,7 @@ parsed.repository.namespace.function.forEach((f) => {
       ? [
           {
             description: doc,
-            tags: parameter.map((p) => {
+            tags: parameters.map((p) => {
               const formattedName = getValidIdentifier(p["@name"]);
 
               return {
@@ -316,7 +354,7 @@ parsed.repository.namespace.function.forEach((f) => {
         ]
       : [],
     returnType: generateReturnType(f["return-value"]),
-    parameters: parameter.map((p) => {
+    parameters: parameters.map((p) => {
       const formattedName = getValidIdentifier(p["@name"]);
 
       return {

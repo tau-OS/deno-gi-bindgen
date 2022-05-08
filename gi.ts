@@ -50,11 +50,28 @@ export interface Namespace {
   enumeration: Enumeration[];
   bitfield: Bitfield[];
   callback: Callback[];
+  union: Union[];
   "glib:boxed": GlibBoxed;
   function: Function[];
   docsection: Docsection;
 }
 
+export interface UnionField {
+  "@name": string;
+  "@readable"?: number;
+  "@private"?: number;
+  "@writable"?: number;
+  type?: Type;
+  array?: Array;
+}
+
+export interface Union {
+  "@name": string;
+  "@c:type": string;
+  doc: Doc;
+  field: UnionField[];
+  method?: Method | Method[];
+}
 export interface Alias {
   "@name": string;
   "@c:type": string;
