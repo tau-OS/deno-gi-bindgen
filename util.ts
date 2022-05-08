@@ -273,8 +273,8 @@ export const generateReturnType = (r: ReturnValue) =>
       : r.array.type["@name"] + "[]"
     : "void") ?? "void";
 
-export const getTypescriptType = (p: Parameter) => {
-  return p.type?.["@name"]
+export const getTypescriptType = (p: Parameter, namespace: string) => {
+  const type = p.type?.["@name"]
     ? goBasicTypeToTsType(p.type["@name"])
       ? goBasicTypeToTsType(p.type["@name"])
       : p.type["@name"]
@@ -283,28 +283,21 @@ export const getTypescriptType = (p: Parameter) => {
       ? goBasicTypeToTsType(p.array.type["@name"]) + "[]"
       : p.array.type["@name"] + "[]"
     : undefined;
+
+  const paramNamespace = resolveNamespace(type!);
+
+  return paramNamespace
+    ? paramNamespace === namespace
+      ? stripNamespace(type!)
+      : type
+    : type;
 };
 
 export const generateParams = (params: Parameter[], namespace: string) =>
   params
     .filter((param) => param["@name"] !== "...")
     .map((p, i) => {
-      const type = getTypescriptType(p);
-
-      if (!type) throw new Error("Invalid parameter type");
-
-      const paramNamespace = resolveNamespace(type);
-      const name = getValidIdentifier(p["@name"]);
-
-      return `${
-        params.length - 2 === i && params[i + 1]["@name"] === "..." ? "" : ""
-      }${name}: ${paramNamespace === namespace ? stripNamespace(type) : type}`;
+      const type = getTypescriptType(p, namespace);
+      return `${getValidIdentifier(p["@name"])}: ${type}`;
     })
     .join(", ");
-
-export const generateParamsDocs = (params: Parameter[]) =>
-  params
-    .map(
-      (p) => ` * @param ${getValidIdentifier(p["@name"])} ${p.doc?.["#text"]}`
-    )
-    .join("\n");

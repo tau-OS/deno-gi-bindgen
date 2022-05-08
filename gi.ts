@@ -154,8 +154,8 @@ export interface Record {
   "@glib:get-type"?: string;
   "@c:symbol-prefix"?: string;
   constructor?: Constructor | undefined[];
-  method?: Method[];
-  function?: Function[];
+  method?: Method | Method[];
+  function?: Function | Function[];
 }
 
 export interface Method {
