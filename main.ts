@@ -191,6 +191,7 @@ sourceFile.addInterface({
 });
 
 parsed.repository.namespace.record.forEach((r) => {
+  if (r["@introspectable"] === 0) return;
   const doc = r.doc?.["#text"];
 
   const classType = sourceFile.addClass({

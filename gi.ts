@@ -147,6 +147,7 @@ export interface Record {
   "@c:type": string;
   "@disguised"?: number;
   "@glib:is-gtype-struct-for"?: string;
+  "@introspectable"?: number;
   "#text": string | null;
   doc?: Doc;
   field: any;
