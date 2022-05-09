@@ -171,7 +171,7 @@ export interface Record {
   "@glib:type-name"?: string;
   "@glib:get-type"?: string;
   "@c:symbol-prefix"?: string;
-  constructor?: Constructor | undefined[];
+  constructor?: Constructor | Constructor[];
   method?: Method | Method[];
   function?: Function | Function[];
 }

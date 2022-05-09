@@ -7,10 +7,13 @@ import {
   getTypescriptType,
   getValidIdentifier,
   goBasicTypeToTsType,
+  goTypeToFFIType,
   xmlList,
 } from "./util.ts";
 import {
   Project,
+  StructureKind,
+  ts,
   VariableDeclarationKind,
   Writers,
 } from "https://deno.land/x/ts_morph@14.0.0/mod.ts";
@@ -168,16 +171,45 @@ parsed.repository.namespace.alias.forEach((a) => {
   });
 });
 
-sourceFile.addInterface({
+const pointerBackedClass = sourceFile.addClass({
   isExported: true,
-  name: "GUnion",
+  name: "PointerBacked",
   properties: [
     {
       name: "pointer",
       type: "Deno.UnsafePointer",
+      hasExclamationToken: true,
     },
   ],
 });
+
+{
+  const method = pointerBackedClass.addMethod({
+    name: "fromPointer",
+    isStatic: true,
+    parameters: [
+      {
+        name: "pointer",
+        type: "Deno.UnsafePointer",
+      },
+    ],
+  });
+
+  method.addVariableStatement({
+    declarationKind: VariableDeclarationKind.Const,
+    declarations: [
+      {
+        name: "obj",
+        initializer: "new this",
+      },
+    ],
+  });
+
+  method.addStatements([
+    "obj.pointer = pointer",
+    Writers.returnStatement("obj"),
+  ]);
+}
 
 parsed.repository.namespace.union.forEach((u) => {
   const doc = u.doc?.["#text"];
@@ -185,7 +217,7 @@ parsed.repository.namespace.union.forEach((u) => {
   const classType = sourceFile.addClass({
     docs: doc ? [{ description: doc }] : [],
     isExported: true,
-    implements: ["GUnion"],
+    extends: "PointerBacked",
     name: u["@name"],
   });
 
@@ -236,7 +268,7 @@ parsed.repository.namespace.record.forEach((r) => {
 
   const classType = sourceFile.addClass({
     isExported: true,
-    implements: ["GObject"],
+    extends: "PointerBacked",
     name: r["@name"],
     docs: doc ? [{ description: doc }] : [],
   });
@@ -319,6 +351,70 @@ parsed.repository.namespace.record.forEach((r) => {
       parameters: f.parameters,
       returnType: f["return-value"],
     });
+  });
+
+  const constructors = xmlList(r.constructor).filter(x => typeof x !== 'function');
+
+  constructors.forEach((c) => {
+    if (c["@introspectable"] === 0) return;
+
+    const parameters = xmlList(c.parameters?.parameter);
+    const docs = c.doc?.["#text"]
+      ? [
+          {
+            description: c.doc?.["#text"],
+            tags: parameters.map((p) => {
+              const formattedName = getValidIdentifier(p["@name"]);
+
+              return {
+                tagName: "param",
+                text: `${formattedName} ${p.doc?.["#text"]}`,
+              };
+            }),
+          },
+        ]
+      : [];
+
+    const method =
+      c["@name"] === "new"
+        ? classType.addConstructor({
+            docs,
+            parameters: parameters.map((p) => {
+              const formattedName = getValidIdentifier(p["@name"]);
+
+              return {
+                name: formattedName,
+                type: getTypescriptType(p, namespace),
+              };
+            }),
+          })
+        : classType.addMethod({
+            name: c["@name"],
+            docs,
+            isStatic: true,
+            returnType: r["@name"],
+            parameters: parameters.map((p) => {
+              const formattedName = getValidIdentifier(p["@name"]);
+
+              return {
+                name: formattedName,
+                type: getTypescriptType(p, namespace),
+              };
+            }),
+          });
+
+    if (c["@name"] === "new") {
+      method.addStatements(["super()"]);
+    } else {
+      method.addStatements([Writers.returnStatement("{} as any")]);
+    }
+
+    ffiFunctions[c["@c:identifier"]] = {
+      parameters: xmlList(c.parameters?.parameter).map((p) =>
+        goTypeToFFIType(p)
+      ),
+      result: "pointer",
+    };
   });
 });
 

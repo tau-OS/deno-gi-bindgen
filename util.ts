@@ -16,6 +16,8 @@ export const goBasicTypeToTsType = (type: string): string | undefined => {
       return "number";
     case "guint32":
       return "number";
+    case "gint16":
+      return "number";
     case "gint32":
       return "number";
     case "guint8":
@@ -57,6 +59,8 @@ export const goBasicTypeToFFIType = (type: string): Deno.NativeType => {
       return "u32";
     case "gssize":
       return "i32";
+    case "gint16":
+      return "i16";
     case "guint16":
       return "u16";
     case "gint64":
@@ -315,7 +319,7 @@ export const generateParams = (params: Parameter[], namespace: string) =>
     .join(", ");
 
 export const xmlList = <T>(value: T | T[] | undefined): T[] =>
-  value ? (value instanceof Array ? value : [value]) : [];
+  value ? (value instanceof Array ? value.filter((v) => v) : [value]) : [];
 
 export const generateFFIFunction = ({
   parameters,
