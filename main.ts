@@ -47,7 +47,7 @@ sourceFile.addImportDeclaration({
   ],
 });
 
-const namespace = parsed.repository.namespace;
+export const namespace = parsed.repository.namespace;
 const namespaceName = namespace["@name"];
 const objectFile = namespace["@shared-library"].split(",")[0];
 const ffiFunctions: Record<string, Deno.ForeignFunction> = {};
@@ -258,7 +258,6 @@ namespace.union.forEach((u) => {
       parameters: m.parameters,
       identifer: m["@c:identifier"],
       returnType: m["return-value"],
-      namespace,
     });
   });
 });
@@ -318,7 +317,6 @@ namespace.record.forEach((r) => {
       parameters: f.parameters,
       identifer: f["@c:identifier"],
       returnType: f["return-value"],
-      namespace,
     });
 
     ffiFunctions[f["@c:identifier"]] = generateFFIFunction({
@@ -362,7 +360,6 @@ namespace.record.forEach((r) => {
       parameters: f.parameters,
       identifer: f["@c:identifier"],
       returnType: f["return-value"],
-      namespace,
     });
 
     ffiFunctions[f["@c:identifier"]] = generateFFIFunction({
@@ -432,7 +429,6 @@ namespace.record.forEach((r) => {
       parameters: c.parameters,
       identifer: c["@c:identifier"],
       returnType: c["return-value"],
-      namespace,
     });
 
     ffiFunctions[c["@c:identifier"]] = {
@@ -484,7 +480,6 @@ namespace.function.forEach((f) => {
     parameters: f.parameters,
     identifer: f["@c:identifier"],
     returnType: f["return-value"],
-    namespace,
   });
 
   ffiFunctions[f["@c:identifier"]] = generateFFIFunction({

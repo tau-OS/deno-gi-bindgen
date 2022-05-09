@@ -4,15 +4,8 @@ import {
   MethodDeclaration,
   Writers,
 } from "https://deno.land/x/ts_morph@14.0.0/mod.ts";
-import type {
-  Parameter,
-  ReturnValue,
-  Parameters,
-  Type,
-  Array,
-  Namespace,
-  Member,
-} from "./gi.ts";
+import type { Parameter, ReturnValue, Parameters, Type, Array } from "./gi.ts";
+import { namespace } from "./main.ts";
 
 export const goBasicTypeToTsType = (type: string): string | undefined => {
   if (gnumberTypes.has(type)) {
@@ -36,7 +29,9 @@ export const goBasicTypeToTsType = (type: string): string | undefined => {
 };
 
 export const goBasicTypeToFFIType = (type: string): Deno.NativeType => {
-  switch (type) {
+  const resolvedType = lookupTypeName(type) ?? type;
+
+  switch (resolvedType) {
     case "gboolean":
       return "i32";
     case "gsize":
@@ -276,41 +271,19 @@ type GType =
       array: Array;
     };
 
-export const lookupType = (namespace: Namespace, param: GType): GType => {
-  if ("array" in param) {
-    // const arr = {...param.array, type: }
-    // param.array.type
-    // return lookupType(namespace, { type: param.array.type! });
-    // throw new Error(JSON.stringify(param));
-    return param;
-  }
-
-  const name = param.type["@name"];
-
+export const lookupTypeName = (name: string): string | undefined => {
   const bitfield = xmlList(namespace.bitfield).find((x) => x["@name"] === name);
-  if (bitfield)
-    return {
-      type: {
-        "@name": "gint",
-      },
-    };
+  if (bitfield) return "gint";
   const enumeration = xmlList(namespace.enumeration).find(
     (x) => x["@name"] === name
   );
-  if (enumeration)
-    return {
-      type: {
-        "@name": "gint",
-      },
-    };
+  if (enumeration) return "gint";
   const alias = xmlList(namespace.alias).find((x) => x["@name"] === name);
-  if (alias) return { type: alias };
-
-  return param;
+  if (alias) return alias.type["@name"];
 };
 
 export const convertToFFIBase = (type: Type, identifier: string) => {
-  const typeName = type["@name"];
+  const typeName = lookupTypeName(type["@name"]) ?? type["@name"];
 
   if (typeName === "gboolean") {
     return `${identifier} === true ? 1 : 0`;
@@ -333,7 +306,8 @@ export const convertToFFIBase = (type: Type, identifier: string) => {
 
 export const convertToFFI = (param: GType, identifier: string) => {
   if ("array" in param) {
-    const name = param.array.type["@name"];
+    const name =
+      lookupTypeName(param.array.type["@name"]) ?? param.array.type["@name"];
 
     if (gnumberTypes.has(name)) {
       const ffiArrayType = goBasicTypeToFFIType(name);
@@ -386,13 +360,11 @@ export const generateFunctionBody = ({
   func,
   parameters,
   identifer,
-  namespace,
 }: {
   func: MethodDeclaration | FunctionDeclaration | ConstructorDeclaration;
   parameters?: Parameters;
   returnType?: ReturnValue;
   identifer: string;
-  namespace: Namespace;
 }) => {
   const params = xmlList(parameters?.parameter);
 
@@ -400,16 +372,9 @@ export const generateFunctionBody = ({
     Writers.returnStatement(
       `ffi.symbols['${identifer}'](${[
         ...(parameters?.["instance-parameter"]
-          ? [
-              convertToFFI(
-                lookupType(namespace, parameters?.["instance-parameter"]),
-                "this"
-              ),
-            ]
+          ? [convertToFFI(parameters?.["instance-parameter"], "this")]
           : []),
-        ...params.map((p) =>
-          convertToFFI(lookupType(namespace, p), getValidIdentifier(p["@name"]))
-        ),
+        ...params.map((p) => convertToFFI(p, getValidIdentifier(p["@name"]))),
       ].join(", ")}) as any`
     ),
   ]);
