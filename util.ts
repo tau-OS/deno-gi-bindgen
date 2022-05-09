@@ -1,43 +1,27 @@
-import type { Parameter, ReturnValue, Parameters, Type, Array } from "./gi.ts";
+import {
+  ConstructorDeclaration,
+  FunctionDeclaration,
+  MethodDeclaration,
+  Writers,
+} from "https://deno.land/x/ts_morph@14.0.0/mod.ts";
+import type {
+  Parameter,
+  ReturnValue,
+  Parameters,
+  Type,
+  Array,
+  Namespace,
+  Member,
+} from "./gi.ts";
 
 export const goBasicTypeToTsType = (type: string): string | undefined => {
+  if (gnumberTypes.has(type)) {
+    return "number";
+  }
+
   switch (type) {
     case "gboolean":
       return "boolean";
-    case "gsize":
-      return "number";
-    case "gssize":
-      return "number";
-    case "guint16":
-      return "number";
-    case "gint64":
-      return "number";
-    case "guint64":
-      return "number";
-    case "guint32":
-      return "number";
-    case "gint16":
-      return "number";
-    case "gint32":
-      return "number";
-    case "guint8":
-      return "number";
-    case "gint":
-      return "number";
-    case "gchar":
-      return "number";
-    case "gunichar":
-      return "number";
-    case "guint":
-      return "number";
-    case "gfloat":
-      return "number";
-    case "gdouble":
-      return "number";
-    case "glong":
-      return "number";
-    case "gulong":
-      return "number";
     case "utf8":
       return "string";
     case "filename":
@@ -114,83 +98,6 @@ export const goTypeToFFIType = (type: { type?: Type; array?: Array }) => {
   }
 
   return goBasicTypeToFFIType(type.type["@name"]);
-};
-
-// export const getBaseFFIConverter = (type: string) => {
-//   if (p.type["@name"] === "gboolean") {
-//     return "boolean";
-//   }
-
-//   if (p.type["@name"] === "utf8" || p.type["@name"] === "filename") {
-//     return "string";
-//   }
-// };
-
-const ffiNumberTypes = new Set([
-  "i8",
-  "u8",
-  "i16",
-  "u16",
-  "i32",
-  "u32",
-  "i64",
-  "u64",
-  "usize",
-  "f32",
-  "f64",
-]);
-
-export const getFFIConverter = (p: Parameter, identifier: string) => {
-  if (p.array) {
-    const ffiArrayType = goBasicTypeToFFIType(p.array.type["@name"]);
-    if (ffiNumberTypes.has(ffiArrayType)) {
-      switch (ffiArrayType) {
-        case "i8":
-          return `new Int8Array(${identifier})`;
-        case "u8":
-          return `new Uint8Array(${identifier})`;
-        case "i16":
-          return `new Int16Array(${identifier})`;
-        case "u16":
-          return `new Uint16Array(${identifier})`;
-        case "i32":
-          return `new Int32Array(${identifier})`;
-        case "u32":
-          return `new Uint32Array(${identifier})`;
-        case "i64":
-          return `new BigInt64Array(${identifier})`;
-        case "u64":
-          return `new BigUint64Array(${identifier})`;
-        case "usize":
-          return `new Uint32Array(${identifier})`;
-        case "f32":
-          return `new Float32Array(${identifier})`;
-        case "f64":
-          return `new Float64Array(${identifier})`;
-      }
-      // new Uint8Array([1]).
-      // Deno.UnsafePointer.of()
-    }
-
-    if (
-      p.array.type["@name"] === "utf8" ||
-      p.array.type["@name"] === "filename"
-    ) {
-      return `new BigInt64Array(${identifier}.map((x) => Deno.UnsafePointer.of(getNullTerminatedCString(x)).value))`;
-    }
-
-    return `noop(${identifier})`;
-  }
-
-  if (p.type["@name"] === "gboolean") {
-    return `getCBoolean(${identifier})`;
-  }
-
-  if (p.type["@name"] === "utf8" || p.type["@name"] === "filename") {
-    return `getNullTerminatedCString(${identifier})`;
-  }
-
-  return `noop(${identifier})`;
 };
 
 const replacementKeywords = new Set([
@@ -312,7 +219,7 @@ export const getTypescriptType = (p: Parameter, namespace: string) => {
 export const generateParams = (params: Parameter[], namespace: string) =>
   params
     .filter((param) => param["@name"] !== "...")
-    .map((p, i) => {
+    .map((p) => {
       const type = getTypescriptType(p, namespace);
       return `${getValidIdentifier(p["@name"])}: ${type}`;
     })
@@ -339,4 +246,134 @@ export const generateFFIFunction = ({
       : [],
     result: goTypeToFFIType(returnType),
   };
+};
+
+const gnumberTypes = new Set([
+  "gsize",
+  "gssize",
+  "gint16",
+  "guint16",
+  "gint64",
+  "guint64",
+  "guint32",
+  "gint32",
+  "guint8",
+  "gint",
+  "gchar",
+  "gunichar",
+  "guint",
+  "gfloat",
+  "gdouble",
+  "glong",
+  "gulong",
+]);
+
+export const lookupType = (namespace: Namespace, type: Type) => {};
+
+export const convertToFFIBase = (type: Type, identifier: string) => {
+  const typeName = type["@name"];
+
+  if (typeName === "gboolean") {
+    return `${identifier} === true ? 1 : 0`;
+  }
+
+  if (typeName === "utf8" || typeName === "filename") {
+    return `getNullTerminatedCString(${identifier})`;
+  }
+
+  if (typeName === "gpointer") {
+    return identifier;
+  }
+
+  if (gnumberTypes.has(typeName)) {
+    return identifier;
+  }
+
+  return `${identifier}.internalPointer`;
+};
+
+export const convertToFFI = (
+  param:
+    | {
+        type: Type;
+      }
+    | {
+        array: Array;
+      },
+  identifier: string
+) => {
+  if ("array" in param) {
+    const name = param.array.type["@name"];
+
+    if (gnumberTypes.has(name)) {
+      const ffiArrayType = goBasicTypeToFFIType(name);
+
+      switch (ffiArrayType) {
+        case "i8":
+          return `new Int8Array(${identifier})`;
+        case "u8":
+          return `new Uint8Array(${identifier})`;
+        case "i16":
+          return `new Int16Array(${identifier})`;
+        case "u16":
+          return `new Uint16Array(${identifier})`;
+        case "i32":
+          return `new Int32Array(${identifier})`;
+        case "u32":
+          return `new Uint32Array(${identifier})`;
+        case "i64":
+          return `new BigInt64Array(${identifier})`;
+        case "u64":
+          return `new BigUint64Array(${identifier})`;
+        case "usize":
+          return `new Uint32Array(${identifier})`;
+        case "f32":
+          return `new Float32Array(${identifier})`;
+        case "f64":
+          return `new Float64Array(${identifier})`;
+      }
+    }
+
+    if (name === "gboolean") {
+      return `new Int32Array(${identifier}.map((x) => x === true ? 1 : 0))`;
+    }
+
+    if (name === "utf8" || name === "filename") {
+      return `new BigInt64Array(${identifier}.map((x) => Deno.UnsafePointer.of(getNullTerminatedCString(x)).value))`;
+    }
+
+    if (name === "gpointer") {
+      return `new BigInt64Array(${identifier}.map((x) => x.value))`;
+    }
+
+    return `new BigInt64Array(${identifier}.map((x) => x.internalPointer.value))`;
+  }
+
+  return convertToFFIBase(param.type, identifier);
+};
+
+export const generateFunctionBody = ({
+  func,
+  parameters,
+  identifer,
+  namespace,
+}: {
+  func: MethodDeclaration | FunctionDeclaration | ConstructorDeclaration;
+  parameters?: Parameters;
+  returnType?: ReturnValue;
+  identifer: string;
+  namespace: Namespace;
+}) => {
+  const params = xmlList(parameters?.parameter);
+
+  func.addStatements([
+    Writers.returnStatement(
+      `ffi.symbols['${identifer}'](${[
+        ...(parameters?.["instance-parameter"]
+          ? [convertToFFI(parameters?.["instance-parameter"], "this")]
+          : []),
+        ...params.map((p) => convertToFFI(p, getValidIdentifier(p["@name"]))),
+      ].join(", ")}) as any`
+    ),
+  ]);
 };

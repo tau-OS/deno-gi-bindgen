@@ -2,6 +2,7 @@ import { parse } from "https://deno.land/x/xml@2.0.4/mod.ts";
 import type { Root } from "./gi.ts";
 import {
   generateFFIFunction,
+  generateFunctionBody,
   generateParams,
   generateReturnType,
   getTypescriptType,
@@ -34,7 +35,6 @@ const parsed = parse(file, {
 const sourceFile = project.createSourceFile("out.ts", undefined, {
   overwrite: true,
 });
-const objectFile = parsed.repository.namespace["@shared-library"].split(",")[0];
 
 sourceFile.addImportDeclaration({
   moduleSpecifier: `./runtime.ts`,
@@ -47,10 +47,12 @@ sourceFile.addImportDeclaration({
   ],
 });
 
-const namespace = parsed.repository.namespace["@name"];
+const namespace = parsed.repository.namespace;
+const namespaceName = namespace["@name"];
+const objectFile = namespace["@shared-library"].split(",")[0];
 const ffiFunctions: Record<string, Deno.ForeignFunction> = {};
 
-parsed.repository.namespace.constant.forEach((c) => {
+namespace.constant.forEach((c) => {
   const doc = c.doc?.["#text"];
 
   sourceFile.addVariableStatement({
@@ -72,7 +74,7 @@ parsed.repository.namespace.constant.forEach((c) => {
   });
 });
 
-parsed.repository.namespace.enumeration.forEach((e) => {
+namespace.enumeration.forEach((e) => {
   const doc = e.doc?.["#text"];
   const members = xmlList(e.member);
 
@@ -100,7 +102,7 @@ parsed.repository.namespace.enumeration.forEach((e) => {
   });
 });
 
-parsed.repository.namespace.bitfield.forEach((b) => {
+namespace.bitfield.forEach((b) => {
   const doc = b.doc?.["#text"];
   const members = xmlList(b.member);
 
@@ -128,9 +130,9 @@ parsed.repository.namespace.bitfield.forEach((b) => {
   });
 });
 
-parsed.repository.namespace.callback.forEach((c) => {
+namespace.callback.forEach((c) => {
   const parameters = xmlList(c.parameters?.parameter);
-  const paramsType = generateParams(parameters, namespace);
+  const paramsType = generateParams(parameters, namespaceName);
 
   const doc = c.doc?.["#text"];
 
@@ -153,7 +155,7 @@ parsed.repository.namespace.callback.forEach((c) => {
   });
 });
 
-parsed.repository.namespace.alias.forEach((a) => {
+namespace.alias.forEach((a) => {
   const doc = a.doc?.["#text"];
   const type = goBasicTypeToTsType(a.type["@name"])
     ? goBasicTypeToTsType(a.type["@name"])
@@ -174,7 +176,7 @@ const pointerBackedClass = sourceFile.addClass({
   name: "PointerBacked",
   properties: [
     {
-      name: "pointer",
+      name: "internalPointer",
       type: "Deno.UnsafePointer",
       hasExclamationToken: true,
     },
@@ -204,12 +206,12 @@ const pointerBackedClass = sourceFile.addClass({
   });
 
   method.addStatements([
-    "obj.pointer = pointer",
+    "obj.internalPointer = pointer",
     Writers.returnStatement("obj"),
   ]);
 }
 
-parsed.repository.namespace.union.forEach((u) => {
+namespace.union.forEach((u) => {
   const doc = u.doc?.["#text"];
 
   const classType = sourceFile.addClass({
@@ -246,12 +248,18 @@ parsed.repository.namespace.union.forEach((u) => {
 
         return {
           name: formattedName,
-          type: getTypescriptType(p, namespace),
+          type: getTypescriptType(p, namespaceName),
         };
       }),
     });
 
-    method.addStatements([Writers.returnStatement("{} as any")]);
+    generateFunctionBody({
+      func: method,
+      parameters: m.parameters,
+      identifer: m["@c:identifier"],
+      returnType: m["return-value"],
+      namespace,
+    });
   });
 });
 
@@ -260,7 +268,7 @@ sourceFile.addInterface({
   name: "GObject",
 });
 
-parsed.repository.namespace.record.forEach((r) => {
+namespace.record.forEach((r) => {
   if (r["@introspectable"] === 0) return;
   const doc = r.doc?.["#text"];
 
@@ -300,12 +308,18 @@ parsed.repository.namespace.record.forEach((r) => {
 
         return {
           name: formattedName,
-          type: getTypescriptType(p, namespace),
+          type: getTypescriptType(p, namespaceName),
         };
       }),
     });
 
-    method.addStatements([Writers.returnStatement("{} as any")]);
+    generateFunctionBody({
+      func: method,
+      parameters: f.parameters,
+      identifer: f["@c:identifier"],
+      returnType: f["return-value"],
+      namespace,
+    });
 
     ffiFunctions[f["@c:identifier"]] = generateFFIFunction({
       parameters: f.parameters,
@@ -338,12 +352,18 @@ parsed.repository.namespace.record.forEach((r) => {
 
         return {
           name: formattedName,
-          type: getTypescriptType(p, namespace),
+          type: getTypescriptType(p, namespaceName),
         };
       }),
     });
 
-    method.addStatements([Writers.returnStatement("{} as any")]);
+    generateFunctionBody({
+      func: method,
+      parameters: f.parameters,
+      identifer: f["@c:identifier"],
+      returnType: f["return-value"],
+      namespace,
+    });
 
     ffiFunctions[f["@c:identifier"]] = generateFFIFunction({
       parameters: f.parameters,
@@ -384,7 +404,7 @@ parsed.repository.namespace.record.forEach((r) => {
 
               return {
                 name: formattedName,
-                type: getTypescriptType(p, namespace),
+                type: getTypescriptType(p, namespaceName),
               };
             }),
           })
@@ -398,16 +418,22 @@ parsed.repository.namespace.record.forEach((r) => {
 
               return {
                 name: formattedName,
-                type: getTypescriptType(p, namespace),
+                type: getTypescriptType(p, namespaceName),
               };
             }),
           });
 
     if (c["@name"] === "new") {
       method.addStatements(["super()"]);
-    } else {
-      method.addStatements([Writers.returnStatement("{} as any")]);
     }
+
+    generateFunctionBody({
+      func: method,
+      parameters: c.parameters,
+      identifer: c["@c:identifier"],
+      returnType: c["return-value"],
+      namespace,
+    });
 
     ffiFunctions[c["@c:identifier"]] = {
       parameters: xmlList(c.parameters?.parameter).map((p) =>
@@ -418,7 +444,7 @@ parsed.repository.namespace.record.forEach((r) => {
   });
 });
 
-parsed.repository.namespace.function.forEach((f) => {
+namespace.function.forEach((f) => {
   if (f["@introspectable"] === 0) return;
 
   const parameters = xmlList(f.parameters?.parameter);
@@ -448,12 +474,18 @@ parsed.repository.namespace.function.forEach((f) => {
 
       return {
         name: formattedName,
-        type: getTypescriptType(p, namespace),
+        type: getTypescriptType(p, namespaceName),
       };
     }),
   });
 
-  func.addStatements([Writers.returnStatement("{} as any")]);
+  generateFunctionBody({
+    func: func,
+    parameters: f.parameters,
+    identifer: f["@c:identifier"],
+    returnType: f["return-value"],
+    namespace,
+  });
 
   ffiFunctions[f["@c:identifier"]] = generateFFIFunction({
     parameters: f.parameters,
