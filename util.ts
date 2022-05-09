@@ -268,7 +268,46 @@ const gnumberTypes = new Set([
   "gulong",
 ]);
 
-export const lookupType = (namespace: Namespace, type: Type) => {};
+type GType =
+  | {
+      type: Type;
+    }
+  | {
+      array: Array;
+    };
+
+export const lookupType = (namespace: Namespace, param: GType): GType => {
+  if ("array" in param) {
+    // const arr = {...param.array, type: }
+    // param.array.type
+    // return lookupType(namespace, { type: param.array.type! });
+    // throw new Error(JSON.stringify(param));
+    return param;
+  }
+
+  const name = param.type["@name"];
+
+  const bitfield = xmlList(namespace.bitfield).find((x) => x["@name"] === name);
+  if (bitfield)
+    return {
+      type: {
+        "@name": "gint",
+      },
+    };
+  const enumeration = xmlList(namespace.enumeration).find(
+    (x) => x["@name"] === name
+  );
+  if (enumeration)
+    return {
+      type: {
+        "@name": "gint",
+      },
+    };
+  const alias = xmlList(namespace.alias).find((x) => x["@name"] === name);
+  if (alias) return { type: alias };
+
+  return param;
+};
 
 export const convertToFFIBase = (type: Type, identifier: string) => {
   const typeName = type["@name"];
@@ -292,16 +331,7 @@ export const convertToFFIBase = (type: Type, identifier: string) => {
   return `${identifier}.internalPointer`;
 };
 
-export const convertToFFI = (
-  param:
-    | {
-        type: Type;
-      }
-    | {
-        array: Array;
-      },
-  identifier: string
-) => {
+export const convertToFFI = (param: GType, identifier: string) => {
   if ("array" in param) {
     const name = param.array.type["@name"];
 
@@ -370,9 +400,16 @@ export const generateFunctionBody = ({
     Writers.returnStatement(
       `ffi.symbols['${identifer}'](${[
         ...(parameters?.["instance-parameter"]
-          ? [convertToFFI(parameters?.["instance-parameter"], "this")]
+          ? [
+              convertToFFI(
+                lookupType(namespace, parameters?.["instance-parameter"]),
+                "this"
+              ),
+            ]
           : []),
-        ...params.map((p) => convertToFFI(p, getValidIdentifier(p["@name"]))),
+        ...params.map((p) =>
+          convertToFFI(lookupType(namespace, p), getValidIdentifier(p["@name"]))
+        ),
       ].join(", ")}) as any`
     ),
   ]);

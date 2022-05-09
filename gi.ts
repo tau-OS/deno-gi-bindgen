@@ -87,7 +87,7 @@ export interface Doc {
 export interface Type {
   "@name": string;
   "@c:type"?: string;
-  "#text": string | null;
+  "#text"?: string;
   type?: Type;
 }
 
