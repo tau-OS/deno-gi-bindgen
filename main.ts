@@ -12,8 +12,6 @@ import {
 } from "./util.ts";
 import {
   Project,
-  StructureKind,
-  ts,
   VariableDeclarationKind,
   Writers,
 } from "https://deno.land/x/ts_morph@14.0.0/mod.ts";
@@ -353,7 +351,9 @@ parsed.repository.namespace.record.forEach((r) => {
     });
   });
 
-  const constructors = xmlList(r.constructor).filter(x => typeof x !== 'function');
+  const constructors = xmlList(r.constructor).filter(
+    (x) => typeof x !== "function"
+  );
 
   constructors.forEach((c) => {
     if (c["@introspectable"] === 0) return;
