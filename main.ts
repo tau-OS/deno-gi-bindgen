@@ -285,6 +285,7 @@ namespace.record.forEach((r) => {
   if (r["@introspectable"] === 0) return;
   const doc = r.doc?.["#text"];
 
+  // TODO: We need a way to just make a struct, if consturctor is not present
   const classType = sourceFile.addClass({
     isExported: true,
     extends: "PointerBacked",
