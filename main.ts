@@ -17,6 +17,8 @@ import {
   Writers,
 } from "https://deno.land/x/ts_morph@14.0.0/mod.ts";
 
+// TODO: Handle nullable types
+
 const project = new Project();
 
 const file = await Deno.open("GLib-2.0.gir");
@@ -229,6 +231,7 @@ namespace.union.forEach((u) => {
 
   const methods = xmlList(u.method);
 
+  // TODO: Do we have to do constructors for this again?
   methods.forEach((m) => {
     const parameters = xmlList(m.parameters.parameter);
     const method = classType.addMethod({
