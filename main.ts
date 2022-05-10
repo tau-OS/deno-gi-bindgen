@@ -387,6 +387,7 @@ namespace.record.forEach((r) => {
     (x) => typeof x !== "function"
   );
 
+  // TODO: We never set the pointer, oopsies
   constructors.forEach((c) => {
     if (c["@introspectable"] === 0) return;
 
