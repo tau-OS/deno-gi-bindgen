@@ -38,19 +38,19 @@ const sourceFile = project.createSourceFile("out.ts", undefined, {
 
 sourceFile.addImportDeclaration({
   moduleSpecifier: `./runtime.ts`,
-  namedImports: [
-    "dlSearch",
-    "fromFFIValue",
-    "noop",
-    "getCBoolean",
-    "getNullTerminatedCString",
-  ],
+  namedImports: ["dlSearch", "getNullTerminatedCString"],
 });
 
 export const namespace = parsed.repository.namespace;
 const namespaceName = namespace["@name"];
 const objectFile = namespace["@shared-library"].split(",")[0];
 const ffiFunctions: Record<string, Deno.ForeignFunction> = {};
+
+// TODO: Temporary because for some reason it generates GType as Type, but references GType
+const gtype = namespace.alias.find((alias) => alias["@name"] === "Type");
+if (gtype) {
+  namespace.alias.push({ ...gtype, "@name": "GType" });
+}
 
 namespace.constant.forEach((c) => {
   const doc = c.doc?.["#text"];
@@ -187,7 +187,13 @@ const pointerBackedClass = sourceFile.addClass({
   const method = pointerBackedClass.addMethod({
     name: "fromPointer",
     isStatic: true,
+    typeParameters: ["T"],
+    returnType: "T",
     parameters: [
+      {
+        name: "this",
+        type: "new (...args: any[]) => T",
+      },
       {
         name: "pointer",
         type: "Deno.UnsafePointer",
@@ -200,7 +206,7 @@ const pointerBackedClass = sourceFile.addClass({
     declarations: [
       {
         name: "obj",
-        initializer: "new this",
+        initializer: "Object.create(this.prototype)",
       },
     ],
   });
@@ -257,6 +263,11 @@ namespace.union.forEach((u) => {
       func: method,
       parameters: m.parameters,
       identifer: m["@c:identifier"],
+      returnType: m["return-value"],
+    });
+
+    ffiFunctions[m["@c:identifier"]] = generateFFIFunction({
+      parameters: m.parameters,
       returnType: m["return-value"],
     });
   });
@@ -425,6 +436,7 @@ namespace.record.forEach((r) => {
     }
 
     generateFunctionBody({
+      shouldReturn: c["@name"] !== "new",
       func: method,
       parameters: c.parameters,
       identifer: c["@c:identifier"],

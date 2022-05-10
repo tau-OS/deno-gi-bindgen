@@ -4,7 +4,14 @@ import {
   MethodDeclaration,
   Writers,
 } from "https://deno.land/x/ts_morph@14.0.0/mod.ts";
-import type { Parameter, ReturnValue, Parameters, Type, Array } from "./gi.ts";
+import type {
+  Parameter,
+  ReturnValue,
+  Parameters,
+  Type,
+  Array,
+  Callback,
+} from "./gi.ts";
 import { namespace } from "./main.ts";
 
 export const goBasicTypeToTsType = (type: string): string | undefined => {
@@ -180,16 +187,22 @@ export const stripNamespace = (name: string) => {
   return parts[parts.length - 1];
 };
 
-export const generateReturnType = (r: ReturnValue) =>
-  (r.type?.["@name"]
-    ? r.type?.["@name"] === "none"
-      ? "void"
-      : goBasicTypeToTsType(r.type["@name"])
-    : r.array?.type["@name"]
-    ? goBasicTypeToTsType(r.array.type["@name"])
-      ? goBasicTypeToTsType(r.array.type["@name"]) + "[]"
-      : r.array.type["@name"] + "[]"
-    : "void") ?? "void";
+export const generateReturnType = (r: ReturnValue) => {
+  if (r.array) {
+    const name =
+      goBasicTypeToTsType(r.array.type["@name"]) ?? r.array.type["@name"];
+    return `${
+      resolveNamespace(name) === namespace["@name"]
+        ? stripNamespace(name)
+        : name
+    }[]`;
+  }
+
+  const name = goBasicTypeToTsType(r.type["@name"]) ?? r.type["@name"];
+  return resolveNamespace(name) === namespace["@name"]
+    ? stripNamespace(name)
+    : name;
+};
 
 export const getTypescriptType = (p: Parameter, namespace: string) => {
   const type = p.type?.["@name"]
@@ -272,36 +285,106 @@ type GType =
     };
 
 export const lookupTypeName = (name: string): string | undefined => {
-  const bitfield = xmlList(namespace.bitfield).find((x) => x["@name"] === name);
+  const type =
+    resolveNamespace(name) === namespace["@name"]
+      ? stripNamespace(name!)
+      : name;
+
+  const bitfield = xmlList(namespace.bitfield).find((x) => x["@name"] === type);
   if (bitfield) return "gint";
   const enumeration = xmlList(namespace.enumeration).find(
-    (x) => x["@name"] === name
+    (x) => x["@name"] === type
   );
   if (enumeration) return "gint";
-  const alias = xmlList(namespace.alias).find((x) => x["@name"] === name);
+  const alias = xmlList(namespace.alias).find((x) => x["@name"] === type);
   if (alias) return alias.type["@name"];
+};
+
+export const lookupCallback = (name: string): Callback | undefined => {
+  const callback = xmlList(namespace.callback).find((x) => x["@name"] === name);
+  if (!callback) return;
+
+  return callback;
 };
 
 export const convertToFFIBase = (type: Type, identifier: string) => {
   const typeName = lookupTypeName(type["@name"]) ?? type["@name"];
+  const callback = lookupCallback(type["@name"]);
 
-  if (typeName === "gboolean") {
+  // TODO: Blocked by https://github.com/denoland/deno/issues/13186, PR https://github.com/denoland/deno/pull/13162
+  if (callback) {
+    return `{} as any`;
+  }
+
+  const name =
+    resolveNamespace(typeName) === namespace["@name"]
+      ? stripNamespace(typeName!)
+      : typeName;
+
+  if (name === "gboolean") {
     return `${identifier} === true ? 1 : 0`;
   }
 
-  if (typeName === "utf8" || typeName === "filename") {
+  if (name === "utf8" || name === "filename") {
     return `getNullTerminatedCString(${identifier})`;
   }
 
-  if (typeName === "gpointer") {
+  if (name === "gpointer") {
     return identifier;
   }
 
-  if (gnumberTypes.has(typeName)) {
+  if (gnumberTypes.has(name)) {
     return identifier;
   }
 
   return `${identifier}.internalPointer`;
+};
+
+export const convertToTSBase = (type: Type, identifier: string) => {
+  const typeName = lookupTypeName(type["@name"]) ?? type["@name"];
+  const callback = lookupCallback(type["@name"]);
+
+  // TODO: Blocked by https://github.com/denoland/deno/issues/13186, PR https://github.com/denoland/deno/pull/13162
+  if (callback) {
+    return `${identifier} as any`;
+  }
+
+  const name =
+    resolveNamespace(typeName) === namespace["@name"]
+      ? stripNamespace(typeName!)
+      : typeName;
+
+  if (name === "gboolean") {
+    return `${identifier} === 1 ? true : false`;
+  }
+
+  if (name === "utf8" || name === "filename") {
+    return `new Deno.UnsafePointerView(${identifier}).getCString()`;
+  }
+
+  if (name === "gpointer") {
+    return identifier;
+  }
+
+  if (gnumberTypes.has(name)) {
+    return identifier;
+  }
+
+  if (name === "none") {
+    return identifier;
+  }
+
+  // Handle object types...
+  return `${name}.fromPointer(${identifier})`;
+};
+
+export const convertToTS = (param: GType, identifier: string) => {
+  if ("array" in param) {
+    // TODO: Handled returned array types...
+    return `${identifier} as any`;
+  }
+
+  return convertToTSBase(param.type, identifier);
 };
 
 export const convertToFFI = (param: GType, identifier: string) => {
@@ -360,22 +443,26 @@ export const generateFunctionBody = ({
   func,
   parameters,
   identifer,
+  returnType,
+  shouldReturn = true,
 }: {
   func: MethodDeclaration | FunctionDeclaration | ConstructorDeclaration;
   parameters?: Parameters;
   returnType?: ReturnValue;
   identifer: string;
+  shouldReturn?: boolean;
 }) => {
   const params = xmlList(parameters?.parameter);
+  const call = `ffi.symbols['${identifer}'](${[
+    ...(parameters?.["instance-parameter"]
+      ? [convertToFFI(parameters?.["instance-parameter"], "this")]
+      : []),
+    ...params.map((p) => convertToFFI(p, getValidIdentifier(p["@name"]))),
+  ].join(", ")})`;
 
   func.addStatements([
-    Writers.returnStatement(
-      `ffi.symbols['${identifer}'](${[
-        ...(parameters?.["instance-parameter"]
-          ? [convertToFFI(parameters?.["instance-parameter"], "this")]
-          : []),
-        ...params.map((p) => convertToFFI(p, getValidIdentifier(p["@name"]))),
-      ].join(", ")}) as any`
-    ),
+    returnType && shouldReturn
+      ? Writers.returnStatement(convertToTS(returnType, call))
+      : call,
   ]);
 };

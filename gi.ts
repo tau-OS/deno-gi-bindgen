@@ -151,14 +151,13 @@ export interface Constructor {
   "@throws"?: number;
 }
 
-export interface ReturnValue {
+export type ReturnValue = {
   "@transfer-ownership": string;
   doc?: Doc;
-  type?: Type;
   "@nullable"?: number;
   array?: Array;
-}
-
+  type: Type;
+};
 export interface Record {
   "@name": string;
   "@c:type": string;

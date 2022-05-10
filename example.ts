@@ -1,19 +1,5 @@
-// import {
-//   // base64_encode,
-//   // build_filenamev,
-//   // get_home_dir,
-//   // USEC_PER_SEC,
-//   // usleep,
-//   // utf8_strdown,
-//   // Array,
+import { MatchInfo, Regex, RegexMatchFlags } from "./out.ts";
 
-// } from "./out.ts";
+// const regex = new Regex("owo", 0, 0);
 
-// usleep(USEC_PER_SEC * 1);
-// console.log(get_home_dir());
-// console.log(utf8_strdown("Deno + GObject Introspection = <3", -1));
-
-// console.log(base64_encode([1, 2, 3], 3));
-// console.log(build_filenamev(["/", "home", "user", "file.txt"]));
-
-import "./out.ts";
+// console.log(regex.match("owo", 0, null as any));
