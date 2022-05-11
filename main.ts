@@ -187,7 +187,7 @@ const pointerBackedClass = sourceFile.addClass({
   const method = pointerBackedClass.addMethod({
     name: "fromPointer",
     isStatic: true,
-    typeParameters: ["T"],
+    typeParameters: ["T extends object"],
     returnType: "T",
     parameters: [
       {
