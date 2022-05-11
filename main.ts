@@ -262,12 +262,15 @@ namespace.union.forEach((u) => {
       }),
     });
 
-    generateFunctionBody({
-      func: method,
-      parameters: m.parameters,
-      identifer: m["@c:identifier"],
-      returnType: m["return-value"],
-    });
+    method.addStatements([
+      Writers.returnStatement(
+        generateFunctionBody({
+          parameters: m.parameters,
+          identifer: m["@c:identifier"],
+          returnType: m["return-value"],
+        })
+      ),
+    ]);
 
     ffiFunctions[m["@c:identifier"]] = generateFFIFunction({
       parameters: m.parameters,
@@ -327,12 +330,15 @@ namespace.record.forEach((r) => {
       }),
     });
 
-    generateFunctionBody({
-      func: method,
-      parameters: f.parameters,
-      identifer: f["@c:identifier"],
-      returnType: f["return-value"],
-    });
+    method.addStatements([
+      Writers.returnStatement(
+        generateFunctionBody({
+          parameters: f.parameters,
+          identifer: f["@c:identifier"],
+          returnType: f["return-value"],
+        })
+      ),
+    ]);
 
     ffiFunctions[f["@c:identifier"]] = generateFFIFunction({
       parameters: f.parameters,
@@ -370,12 +376,15 @@ namespace.record.forEach((r) => {
       }),
     });
 
-    generateFunctionBody({
-      func: method,
-      parameters: f.parameters,
-      identifer: f["@c:identifier"],
-      returnType: f["return-value"],
-    });
+    method.addStatements([
+      Writers.returnStatement(
+        generateFunctionBody({
+          parameters: f.parameters,
+          identifer: f["@c:identifier"],
+          returnType: f["return-value"],
+        })
+      ),
+    ]);
 
     ffiFunctions[f["@c:identifier"]] = generateFFIFunction({
       parameters: f.parameters,
@@ -387,7 +396,6 @@ namespace.record.forEach((r) => {
     (x) => typeof x !== "function"
   );
 
-  // TODO: We never set the pointer, oopsies
   constructors.forEach((c) => {
     if (c["@introspectable"] === 0) return;
 
@@ -436,17 +444,21 @@ namespace.record.forEach((r) => {
             }),
           });
 
-    if (c["@name"] === "new") {
-      method.addStatements(["super()"]);
-    }
-
-    generateFunctionBody({
-      shouldReturn: c["@name"] !== "new",
-      func: method,
+    const body = generateFunctionBody({
       parameters: c.parameters,
       identifer: c["@c:identifier"],
       returnType: c["return-value"],
+      convertReturn: false,
     });
+
+    if (c["@name"] === "new") {
+      method.addStatements(["super()"]);
+      method.addStatements(["this.internalPointer = " + body]);
+    } else {
+      method.addStatements([
+        Writers.returnStatement(`this.fromPointer(${body})`),
+      ]);
+    }
 
     ffiFunctions[c["@c:identifier"]] = {
       parameters: xmlList(c.parameters?.parameter).map((p) =>
@@ -492,12 +504,15 @@ namespace.function.forEach((f) => {
     }),
   });
 
-  generateFunctionBody({
-    func: func,
-    parameters: f.parameters,
-    identifer: f["@c:identifier"],
-    returnType: f["return-value"],
-  });
+  func.addStatements([
+    Writers.returnStatement(
+      generateFunctionBody({
+        parameters: f.parameters,
+        identifer: f["@c:identifier"],
+        returnType: f["return-value"],
+      })
+    ),
+  ]);
 
   ffiFunctions[f["@c:identifier"]] = generateFFIFunction({
     parameters: f.parameters,

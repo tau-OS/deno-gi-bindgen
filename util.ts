@@ -440,17 +440,15 @@ export const convertToFFI = (param: GType, identifier: string) => {
 };
 
 export const generateFunctionBody = ({
-  func,
   parameters,
   identifer,
   returnType,
-  shouldReturn = true,
+  convertReturn = true,
 }: {
-  func: MethodDeclaration | FunctionDeclaration | ConstructorDeclaration;
   parameters?: Parameters;
   returnType?: ReturnValue;
   identifer: string;
-  shouldReturn?: boolean;
+  convertReturn?: boolean;
 }) => {
   const params = xmlList(parameters?.parameter);
   const call = `ffi.symbols['${identifer}'](${[
@@ -460,9 +458,5 @@ export const generateFunctionBody = ({
     ...params.map((p) => convertToFFI(p, getValidIdentifier(p["@name"]))),
   ].join(", ")})`;
 
-  func.addStatements([
-    returnType && shouldReturn
-      ? Writers.returnStatement(convertToTS(returnType, call))
-      : call,
-  ]);
+  return returnType && convertReturn ? convertToTS(returnType, call) : call;
 };
