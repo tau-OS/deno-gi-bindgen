@@ -1,9 +1,3 @@
-import {
-  ConstructorDeclaration,
-  FunctionDeclaration,
-  MethodDeclaration,
-  Writers,
-} from "https://deno.land/x/ts_morph@14.0.0/mod.ts";
 import type {
   Parameter,
   ReturnValue,
@@ -187,48 +181,32 @@ export const stripNamespace = (name: string) => {
   return parts[parts.length - 1];
 };
 
-export const generateReturnType = (r: ReturnValue) => {
-  if (r.array) {
-    const name =
-      goBasicTypeToTsType(r.array.type["@name"]) ?? r.array.type["@name"];
-    return `${
-      resolveNamespace(name) === namespace["@name"]
-        ? stripNamespace(name)
-        : name
-    }[]`;
-  }
+export interface GFunctionType {
+  "@nullable"?: number;
+  array?: Array;
+  type: Type;
+}
 
-  const name = goBasicTypeToTsType(r.type["@name"]) ?? r.type["@name"];
-  return resolveNamespace(name) === namespace["@name"]
-    ? stripNamespace(name)
-    : name;
+export const getTypescriptType = (p: GFunctionType) => {
+  const name = p.array?.type["@name"] ?? p.type["@name"];
+
+  const type =
+    resolveNamespace(name) === namespace["@name"] ? stripNamespace(name) : name;
+
+  const resolved = goBasicTypeToTsType(type);
+
+  return (
+    (resolved ?? type) +
+    (p.array ? "[]" : "") +
+    (p["@nullable"] === 1 ? " | null" : "")
+  );
 };
 
-export const getTypescriptType = (p: Parameter, namespace: string) => {
-  const type = p.type?.["@name"]
-    ? goBasicTypeToTsType(p.type["@name"])
-      ? goBasicTypeToTsType(p.type["@name"])
-      : p.type["@name"]
-    : p.array?.type["@name"]
-    ? goBasicTypeToTsType(p.array.type["@name"])
-      ? goBasicTypeToTsType(p.array.type["@name"]) + "[]"
-      : p.array.type["@name"] + "[]"
-    : undefined;
-
-  const paramNamespace = resolveNamespace(type!);
-
-  return paramNamespace
-    ? paramNamespace === namespace
-      ? stripNamespace(type!)
-      : type
-    : type;
-};
-
-export const generateParams = (params: Parameter[], namespace: string) =>
+export const generateParams = (params: Parameter[]) =>
   params
     .filter((param) => param["@name"] !== "...")
     .map((p) => {
-      const type = getTypescriptType(p, namespace);
+      const type = getTypescriptType(p);
       return `${getValidIdentifier(p["@name"])}: ${type}`;
     })
     .join(", ");
@@ -275,14 +253,6 @@ const gnumberTypes = new Set([
   "glong",
   "gulong",
 ]);
-
-type GType =
-  | {
-      type: Type;
-    }
-  | {
-      array: Array;
-    };
 
 export const lookupTypeName = (name: string): string | undefined => {
   const type =
@@ -378,7 +348,7 @@ export const convertToTSBase = (type: Type, identifier: string) => {
   return `${name}.fromPointer(${identifier})`;
 };
 
-export const convertToTS = (param: GType, identifier: string) => {
+export const convertToTS = (param: GFunctionType, identifier: string) => {
   if ("array" in param) {
     // TODO: Handled returned array types...
     return `${identifier} as any`;
@@ -387,8 +357,8 @@ export const convertToTS = (param: GType, identifier: string) => {
   return convertToTSBase(param.type, identifier);
 };
 
-export const convertToFFI = (param: GType, identifier: string) => {
-  if ("array" in param) {
+export const convertToFFI = (param: GFunctionType, identifier: string) => {
+  if (param.array) {
     const name =
       lookupTypeName(param.array.type["@name"]) ?? param.array.type["@name"];
 
@@ -455,8 +425,22 @@ export const generateFunctionBody = ({
     ...(parameters?.["instance-parameter"]
       ? [convertToFFI(parameters?.["instance-parameter"], "this")]
       : []),
-    ...params.map((p) => convertToFFI(p, getValidIdentifier(p["@name"]))),
+    ...params.map((p) => {
+      const identifer = getValidIdentifier(p["@name"]);
+      const param = convertToFFI(p, identifer);
+
+      return p["@nullable"] === 1
+        ? `${identifer} === null ? null : ${param}`
+        : param;
+    }),
   ].join(", ")})`;
+
+  if (returnType && convertReturn && returnType["@nullable"] === 1) {
+    return `nullableExpression(${call}, (x) => ${convertToTS(
+      returnType,
+      "x"
+    )})`;
+  }
 
   return returnType && convertReturn ? convertToTS(returnType, call) : call;
 };

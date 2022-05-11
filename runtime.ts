@@ -11,7 +11,7 @@ export const dlSearch = async (dl: string) => {
   const libraryPath = /: ([^\s]+)/g.exec(output)?.[1];
 
   if (!libraryPath) {
-    throw "Could not find ${objectFile}";
+    throw `Could not find ${dl}`;
   }
 
   return libraryPath;
@@ -19,3 +19,14 @@ export const dlSearch = async (dl: string) => {
 
 export const getNullTerminatedCString = (str: string) =>
   new Uint8Array([...new TextEncoder().encode(str), ...new Uint8Array([0])]);
+
+export const nullableExpression = <T, U>(
+  value: T,
+  converter: (value: T) => U
+): U | null => {
+  if (value === null) {
+    return null;
+  }
+
+  return converter(value);
+};

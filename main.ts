@@ -4,7 +4,6 @@ import {
   generateFFIFunction,
   generateFunctionBody,
   generateParams,
-  generateReturnType,
   getTypescriptType,
   getValidIdentifier,
   goBasicTypeToTsType,
@@ -40,7 +39,7 @@ const sourceFile = project.createSourceFile("out.ts", undefined, {
 
 sourceFile.addImportDeclaration({
   moduleSpecifier: `./runtime.ts`,
-  namedImports: ["dlSearch", "getNullTerminatedCString"],
+  namedImports: ["dlSearch", "getNullTerminatedCString", "nullableExpression"],
 });
 
 export const namespace = parsed.repository.namespace;
@@ -134,7 +133,7 @@ namespace.bitfield.forEach((b) => {
 
 namespace.callback.forEach((c) => {
   const parameters = xmlList(c.parameters?.parameter);
-  const paramsType = generateParams(parameters, namespaceName);
+  const paramsType = generateParams(parameters);
 
   const doc = c.doc?.["#text"];
 
@@ -153,7 +152,7 @@ namespace.callback.forEach((c) => {
     isExported: true,
     name: c["@name"],
     // TODO: aaaaa
-    type: `(${paramsType}) => ${generateReturnType(c["return-value"])}`,
+    type: `(${paramsType}) => ${getTypescriptType(c["return-value"])}`,
   });
 });
 
@@ -251,13 +250,13 @@ namespace.union.forEach((u) => {
             },
           ]
         : [],
-      returnType: generateReturnType(m["return-value"]),
+      returnType: getTypescriptType(m["return-value"]),
       parameters: parameters.map((p) => {
         const formattedName = getValidIdentifier(p["@name"]);
 
         return {
           name: formattedName,
-          type: getTypescriptType(p, namespaceName),
+          type: getTypescriptType(p),
         };
       }),
     });
@@ -319,13 +318,13 @@ namespace.record.forEach((r) => {
           ]
         : [],
       isStatic: true,
-      returnType: generateReturnType(f["return-value"]),
+      returnType: getTypescriptType(f["return-value"]),
       parameters: parameters.map((p) => {
         const formattedName = getValidIdentifier(p["@name"]);
 
         return {
           name: formattedName,
-          type: getTypescriptType(p, namespaceName),
+          type: getTypescriptType(p),
         };
       }),
     });
@@ -365,13 +364,13 @@ namespace.record.forEach((r) => {
             },
           ]
         : [],
-      returnType: generateReturnType(f["return-value"]),
+      returnType: getTypescriptType(f["return-value"]),
       parameters: parameters.map((p) => {
         const formattedName = getValidIdentifier(p["@name"]);
 
         return {
           name: formattedName,
-          type: getTypescriptType(p, namespaceName),
+          type: getTypescriptType(p),
         };
       }),
     });
@@ -425,7 +424,7 @@ namespace.record.forEach((r) => {
 
               return {
                 name: formattedName,
-                type: getTypescriptType(p, namespaceName),
+                type: getTypescriptType(p),
               };
             }),
           })
@@ -439,7 +438,7 @@ namespace.record.forEach((r) => {
 
               return {
                 name: formattedName,
-                type: getTypescriptType(p, namespaceName),
+                type: getTypescriptType(p),
               };
             }),
           });
@@ -493,13 +492,13 @@ namespace.function.forEach((f) => {
           },
         ]
       : [],
-    returnType: generateReturnType(f["return-value"]),
+    returnType: getTypescriptType(f["return-value"]),
     parameters: parameters.map((p) => {
       const formattedName = getValidIdentifier(p["@name"]);
 
       return {
         name: formattedName,
-        type: getTypescriptType(p, namespaceName),
+        type: getTypescriptType(p),
       };
     }),
   });
