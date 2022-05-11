@@ -43,7 +43,6 @@ sourceFile.addImportDeclaration({
 });
 
 export const namespace = parsed.repository.namespace;
-const namespaceName = namespace["@name"];
 const objectFile = namespace["@shared-library"].split(",")[0];
 const ffiFunctions: Record<string, Deno.ForeignFunction> = {};
 
@@ -193,7 +192,7 @@ const pointerBackedClass = sourceFile.addClass({
     parameters: [
       {
         name: "this",
-        type: "new (...args: any[]) => T",
+        type: "{ prototype: T }",
       },
       {
         name: "pointer",
@@ -287,12 +286,12 @@ namespace.record.forEach((r) => {
   if (r["@introspectable"] === 0) return;
   const doc = r.doc?.["#text"];
 
-  // TODO: We need a way to just make a struct, if consturctor is not present
   const classType = sourceFile.addClass({
     isExported: true,
     extends: "PointerBacked",
     name: r["@name"],
     docs: doc ? [{ description: doc }] : [],
+    isAbstract: xmlList(r.constructor).every((c) => c["@name"] !== "new"),
   });
 
   const func = xmlList(r.function).filter((f) => f["@introspectable"] !== 0);
