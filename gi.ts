@@ -41,18 +41,18 @@ export interface Namespace {
   "@shared-library": string;
   "@c:identifier-prefixes": string;
   "@c:symbol-prefixes": string;
-  alias: Alias[];
-  "function-macro": FunctionMacro[];
-  constant: Constant[];
-  class: Class[];
-  record: Record[];
-  interface: Interface[];
-  enumeration: Enumeration[];
-  bitfield: Bitfield[];
-  callback: Callback[];
-  union: Union[];
+  alias?: Alias | Alias[];
+  "function-macro"?: FunctionMacro | FunctionMacro[];
+  constant?: Constant | Constant[];
+  class?: Class | Class[];
+  record?: Record | Record[];
+  interface?: Interface | Interface[];
+  enumeration?: Enumeration | Enumeration[];
+  bitfield?: Bitfield | Bitfield[];
+  callback?: Callback | Callback[];
+  union?: Union | Union[];
   "glib:boxed": GlibBoxed;
-  function: Function[];
+  function?: Function | Function[];
   docsection: Docsection;
 }
 

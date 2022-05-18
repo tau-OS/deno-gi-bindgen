@@ -20,7 +20,7 @@ import {
 
 const project = new Project();
 
-const file = await Deno.open("GLib-2.0.gir");
+const file = await Deno.open("Gtk-4.0.gir");
 const { size } = await file.stat();
 
 const parsed = parse(file, {
@@ -47,12 +47,16 @@ const objectFile = namespace["@shared-library"].split(",")[0];
 const ffiFunctions: Record<string, Deno.ForeignFunction> = {};
 
 // TODO: Temporary because for some reason it generates GType as Type, but references GType
-const gtype = namespace.alias.find((alias) => alias["@name"] === "Type");
+const gtype = xmlList(namespace.alias).find(
+  (alias) => alias["@name"] === "Type"
+);
 if (gtype) {
-  namespace.alias.push({ ...gtype, "@name": "GType" });
+  xmlList(namespace.alias).push({ ...gtype, "@name": "GType" });
 }
 
-namespace.constant.forEach((c) => {
+console.log("Constant");
+
+xmlList(namespace.constant).forEach((c) => {
   const doc = c.doc?.["#text"];
 
   sourceFile.addVariableStatement({
@@ -74,7 +78,9 @@ namespace.constant.forEach((c) => {
   });
 });
 
-namespace.enumeration.forEach((e) => {
+console.log("enum");
+
+xmlList(namespace.enumeration).forEach((e) => {
   const doc = e.doc?.["#text"];
   const members = xmlList(e.member);
 
@@ -89,7 +95,8 @@ namespace.enumeration.forEach((e) => {
         ]
       : [],
     members: members.map((m) => ({
-      name: m["@name"],
+      // TODO: Sometimes this XML parser converts stuff like 'false' to a boolean
+      name: m["@name"].toString(),
       value: m["@value"],
       docs: m.doc?.["#text"]
         ? [
@@ -102,7 +109,9 @@ namespace.enumeration.forEach((e) => {
   });
 });
 
-namespace.bitfield.forEach((b) => {
+console.log("bitfield");
+
+xmlList(namespace.bitfield).forEach((b) => {
   const doc = b.doc?.["#text"];
   const members = xmlList(b.member);
 
@@ -130,7 +139,9 @@ namespace.bitfield.forEach((b) => {
   });
 });
 
-namespace.callback.forEach((c) => {
+console.log("callback");
+
+xmlList(namespace.callback).forEach((c) => {
   const parameters = xmlList(c.parameters?.parameter);
   const paramsType = generateParams(parameters);
 
@@ -155,7 +166,9 @@ namespace.callback.forEach((c) => {
   });
 });
 
-namespace.alias.forEach((a) => {
+console.log("alias");
+
+xmlList(namespace.alias)?.forEach((a) => {
   const doc = a.doc?.["#text"];
   const type = goBasicTypeToTsType(a.type["@name"])
     ? goBasicTypeToTsType(a.type["@name"])
@@ -217,7 +230,9 @@ const pointerBackedClass = sourceFile.addClass({
   ]);
 }
 
-namespace.union.forEach((u) => {
+console.log("union");
+
+xmlList(namespace.union).forEach((u) => {
   const doc = u.doc?.["#text"];
 
   const classType = sourceFile.addClass({
@@ -282,7 +297,9 @@ sourceFile.addInterface({
   name: "GObject",
 });
 
-namespace.record.forEach((r) => {
+console.log("record");
+
+xmlList(namespace.record).forEach((r) => {
   if (r["@introspectable"] === 0) return;
   const doc = r.doc?.["#text"];
 
@@ -467,7 +484,9 @@ namespace.record.forEach((r) => {
   });
 });
 
-namespace.function.forEach((f) => {
+console.log("function");
+
+xmlList(namespace.function).forEach((f) => {
   if (f["@introspectable"] === 0) return;
 
   const parameters = xmlList(f.parameters?.parameter);
@@ -517,6 +536,8 @@ namespace.function.forEach((f) => {
     returnType: f["return-value"],
   });
 });
+
+console.log("build");
 
 sourceFile.insertVariableStatement(1, {
   isExported: true,
